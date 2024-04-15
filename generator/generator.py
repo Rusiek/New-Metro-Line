@@ -2,8 +2,6 @@ import numpy as np
 import json
 from abc import ABC, abstractmethod
 import os
-import pyvoronoi
-import matplotlib.pyplot as plt
 
 BASE_SEED = 129348
 

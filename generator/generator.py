@@ -246,5 +246,5 @@ class ConsecutiveGenerator(BaseGenerator):
 # l systems generators
 
 if __name__ == '__main__':
-    cg = GridGenerator(path=os.path.abspath("benchmark/test"))
+    cg = GridGenerator(path=os.path.abspath("../benchmark/test"))
     cg.generate_batch("tmp", [16, 23], [{'s': 100}, {'s': 300}])

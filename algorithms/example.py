@@ -62,7 +62,7 @@ class BaseAlgo:
                 output.append(tmp)
         return output
 
-    def generate_new_candidates(self, candidates: list) -> list: # or list of lists ??
+    def generate_new_candidates(self, candidates: list) -> list:
         ...
  
     def visualize(self, save_plot=False, file_path=None, title=None, **kwargs):
@@ -103,7 +103,6 @@ class BaseAlgo:
         for i in tqdm.tqdm(range(iterations)):
             self.actual_population = \
                 self.generate_init_candidates() if i == 0 else self.generate_new_candidates(self.actual_population)
-            self.actual_population = self.iterate(self.actual_population)
             scores = []
             for candidate in self.actual_population:
                 G = self.G.copy()
@@ -111,7 +110,6 @@ class BaseAlgo:
                     weight = dist(candidate[0], candidate[1], G) * self.metro_params['time/km']
                     G.add_edge(candidate[0], candidate[1], weight=weight)
                 scores.append(get_score_cost(G, self.metro_params, candidate)[0])
-            self.actual_population = self.reduce_curr_population(self.actual_population, scores)
 
             best_sol_idx = scores.index(min(scores))
             best_sol = self.actual_population[best_sol_idx]

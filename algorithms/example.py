@@ -37,7 +37,7 @@ def get_score_cost(G, metro_params, solution):
 
 
 class BaseAlgo:
-    def __init__(self, G, metro_params, vis_path=None, sol_path=None, gif_path=None):
+    def __init__(self, G, metro_params, max_cost=float('inf'), vis_path=None, sol_path=None, gif_path=None):
         self.G = G
         self.metro_params = metro_params
         self.nodes = len(G.nodes)
@@ -49,9 +49,18 @@ class BaseAlgo:
         self.best_score = None
         self.actual_population = None
         self.gif_path = gif_path
+        self.metro_params['max_cost'] = max_cost
 
-    def generate_init_candidates(self, n = 100) -> list: # or list of lists ??
-        ...
+    def generate_init_candidates(self, n = 10) -> list:
+        output = []
+        while len(output) < n:
+            tmp = [i for i in range(self.nodes)]
+            random.shuffle(tmp)
+            tmp = tmp[:random.randint(2, self.nodes)]
+            metro_cost = get_score_cost(self.G, self.metro_params, tmp)[1]
+            if metro_cost < self.metro_params['max_cost']:
+                output.append(tmp)
+        return output
 
     def generate_new_candidates(self, candidates: list) -> list: # or list of lists ??
         ...
@@ -142,15 +151,6 @@ class BaseAlgo:
 
 
 class UselessAlgo(BaseAlgo):
-    def generate_init_candidates(self):
-        output = []
-        for _ in range(10):
-            u, v, x = random.sample(range(self.nodes), 3)
-            while u == v or v == x or u == x:
-                u, v, x = random.sample(range(self.nodes), 3)
-            output.append([u, v, x])
-        return output
-
     def generate_new_candidates(self, candidates):
         return self.generate_init_candidates()
 
@@ -178,7 +178,7 @@ if __name__ == '__main__':
         return G
 
     G = load_graph('/home/rusiek/Studia/vi_sem/New-Metro-Line/benchmark/test/GridGenerator_tmp_0_16.json')
-    metro_params = {'time/km': 0, 'cost/km': 10, 'cost/station': 10}
+    metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
     algo = UselessAlgo(G, metro_params, vis_path='visualizations/vis', sol_path='solutions/sol')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
     # print(algo.best_solution)

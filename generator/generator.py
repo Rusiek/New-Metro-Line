@@ -196,6 +196,11 @@ class GridGenerator(BaseGenerator):
                     if self.rng.random() < self.p:
                         if neighbor_idx not in graph[idx]['adj']:
                             graph[idx]['adj'].append((neighbor_idx, int(self.rng.integers(self.c[0], self.c[1]))))
+                        if not neighbor_idx in graph:
+                            graph[neighbor_idx] = {}
+                            graph[neighbor_idx]['x'] = (neighbor_idx % height) * self.s
+                            graph[neighbor_idx]['y'] = (neighbor_idx // height) * self.s
+                            graph[neighbor_idx]['adj'] = []
                         if idx not in graph[neighbor_idx]['adj']:
                             graph[neighbor_idx]['adj'].append((idx, int(self.rng.integers(self.c[0], self.c[1]))))
 

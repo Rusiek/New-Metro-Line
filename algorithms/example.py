@@ -64,12 +64,6 @@ class BaseAlgo:
 
     def generate_new_candidates(self, candidates: list) -> list: # or list of lists ??
         ...
-
-    def iterate(self, candidates: list) -> list: # or list of lists ??
-        ...
-
-    def reduce_curr_population(self, candidates: list, scores: list, ratio: float = 0.1) -> list: # or list of lists ??
-        ...
  
     def visualize(self, save_plot=False, file_path=None, title=None, **kwargs):
         plt.figure(figsize=(10, 10))
@@ -153,12 +147,6 @@ class BaseAlgo:
 class UselessAlgo(BaseAlgo):
     def generate_new_candidates(self, candidates):
         return self.generate_init_candidates()
-
-    def iterate(self, candidates):
-        return candidates
-
-    def reduce_curr_population(self, candidates, scores, ratio=0.1):
-        return candidates
 
 
 if __name__ == '__main__':

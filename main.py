@@ -1,6 +1,6 @@
 import sys
 import os
-from algorithms.example import UselessAlgo
+from algorithms.example import UselessAlgo, BeesAlgo
 from benchmark.evaluate import Evaluate
 from loader import load_graph, load_constraints, load_metro_params
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     gif_path = sys.argv[1].split('.')[0] + '/solution.gif'
 
-    algo = UselessAlgo(G, metro, max_cost=max_cost, vis_path=vis_path, sol_path=sol_path, gif_path=gif_path)
+    algo = BeesAlgo(G, metro, max_cost=max_cost, vis_path=vis_path, sol_path=sol_path, gif_path=gif_path)
     algo.run(visualize=True, save_best=True, generate_gif=True, verbose=0)
     solution = algo.best_solution
     output = worker.evaluate(solution)

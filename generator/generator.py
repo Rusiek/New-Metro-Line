@@ -197,7 +197,7 @@ class GridGenerator(BaseGenerator):
                         if neighbor_idx not in graph[idx]['adj']:
                             graph[idx]['adj'].append((neighbor_idx, int(self.rng.integers(self.c[0], self.c[1]))))
                         if idx not in graph[neighbor_idx]['adj']:
-                            graph[neighbor_idx]['adj'].append(idx, int(self.rng.integers(self.c[0], self.c[1])))
+                            graph[neighbor_idx]['adj'].append((idx, int(self.rng.integers(self.c[0], self.c[1]))))
 
         self.save_json(graph, ret)
         return [self.path]

@@ -37,7 +37,7 @@ def get_score_cost(G, metro_params, solution):
 
 
 class BaseAlgo:
-    def __init__(self, G, metro_params, vis_path=None, sol_path=None):
+    def __init__(self, G, metro_params, vis_path=None, sol_path=None, gif_path=None):
         self.G = G
         self.metro_params = metro_params
         self.nodes = len(G.nodes)
@@ -48,6 +48,7 @@ class BaseAlgo:
         self.best_solution = None
         self.best_score = None
         self.actual_population = None
+        self.gif_path = gif_path
 
     def generate_init_candidates(self, n = 100) -> list: # or list of lists ??
         ...
@@ -131,7 +132,7 @@ class BaseAlgo:
                 print(scores_cost)
             
         if generate_gif:
-            self.generate_gif('vis.gif', iterations=iterations)
+            self.generate_gif(self.gif_path, iterations=iterations)
 
     def generate_gif(self, path, iterations=100):
         images = []

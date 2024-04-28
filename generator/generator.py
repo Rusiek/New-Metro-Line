@@ -227,7 +227,7 @@ class ConsecutiveGenerator(BaseGenerator):
         graph = {}
         for i in range(size):
             graph['nodes'] = size
-            graph['edges'] = size - 1
+            graph['edges'] = 2 * size
             graph[i] = {}
             graph[i]['x'] = i
             graph[i]['y'] = i % 2

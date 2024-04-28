@@ -194,7 +194,10 @@ class GridGenerator(BaseGenerator):
                 graph[idx]['adj'] = []
                 for neighbor_idx in self._get_neigbors(row, col, width, height):
                     if self.rng.random() < self.p:
-                        graph[idx]['adj'].append((neighbor_idx, int(self.rng.integers(self.c[0], self.c[1]))))
+                        if neighbor_idx not in graph[idx]['adj']:
+                            graph[idx]['adj'].append((neighbor_idx, int(self.rng.integers(self.c[0], self.c[1]))))
+                        if idx not in graph[neighbor_idx]['adj']:
+                            graph[neighbor_idx]['adj'].append(idx, int(self.rng.integers(self.c[0], self.c[1])))
 
         self.save_json(graph, ret)
         return [self.path]

@@ -2,6 +2,7 @@ import numpy as np
 import json
 from abc import ABC, abstractmethod
 import os
+from collections import defaultdict
 
 BASE_SEED = 129348
 
@@ -21,12 +22,6 @@ class BaseGenerator(ABC):
         self.path = path
         self.name = name
         self.rng = np.random.default_rng(self.seed)
-
-        # global deafult kwargs values(should not be used but is here just in case)
-        self.DEF_TIME = 5
-        self.DEF_COST = 10
-        self.DEF_STATION_COST = 10
-        self.DEF_MAX_COST = 30
 
     @abstractmethod
     def generate(self, size:int | list[int], path: str = None, *args, **kwargs) -> list[str]:
@@ -50,8 +45,8 @@ class BaseGenerator(ABC):
 
     def _generate_init(self, size:int | list[int], path: str = None, *args, **kwargs) -> None:
         if type(size) is list:
+            end_list = []
             for ssize in size:
-                end_list = []
                 end_list.extend(self.generate(ssize, path, **kwargs))
             return end_list
 
@@ -59,15 +54,10 @@ class BaseGenerator(ABC):
             path = os.path.join(self.path, f"{self.name}_{size}.json")
         else:
             path += f"_{size}.json"
-
-        self.set_default_kwargs(kwargs.get('time', self.DEF_TIME),
-                                kwargs.get('cost', self.DEF_COST),
-                                kwargs.get('station_cost', self.DEF_STATION_COST),
-                                kwargs.get('max_cost', self.DEF_MAX_COST))
         
         return path
 
-    def generate_batch(self, bid: int | str, size: int | list[int], kwargs_set: list[dict], *args, **kwargs) -> list[str]:
+    def generate_batch(self, bid: int | str, size: int | list[int], kwargs_set: list[dict] | None = None, *args, **kwargs) -> list[str]:
         """ batch generator
         
         bid:
@@ -88,6 +78,11 @@ class BaseGenerator(ABC):
         path_sufix_id = bid if type(bid) is int else 0
         end_files = []
 
+        if kwargs_set is None:
+            if isinstance(size, int):
+                kwargs_set = [{}]
+            else:
+                kwargs_set = [{} for _ in range(len(size))]
         for kset in kwargs_set:
             cpath = os.path.join(self.path, f"{self.name}_{path_sufix}{path_sufix_id}")
             end_files.extend(self.generate(size, cpath, **kset))
@@ -106,22 +101,18 @@ class BaseGenerator(ABC):
         with open(path, 'w') as f:
             json.dump(json_data, f)
 
-    def set_default_kwargs(self, time: int, cost: int, station_cost: int, max_cost: int) -> None:
-        self.time = time
-        self.cost = cost
-        self.station_cost = station_cost
-        self.max_cost = max_cost
-
 
 class GridGenerator(BaseGenerator):
     """
     kwargs:
-        d: float = 0.5
+        d: float = 0.2
             randomness parameter of points placement. If 1 a point can be place one grid cell away
             from it's original location. If <= 0 the point will not have any randomness. scales accordingly.
-        s: float = 200
+        s: float = 10
             cell size
-        c: tuple(int) = (5, 10)
+        c: float = 30
+            The higher the value the slower the streat traffic flows. The real flow value is randomly choosen
+            from range (c, inf) with poisson distribution. The weight is calculated with equation w=dist*flow
         P: float = 0.9
             dropout rate. specifies a chance that and adjecency will stay in grid.
     """
@@ -134,13 +125,14 @@ class GridGenerator(BaseGenerator):
         # basic kwargs default values
         self.DEF_TIME = 5
         self.DEF_COST = 10
-        self.DEF_STATION_COST = 10
-        self.DEF_MAX_COST = 30
+        self.DEF_STATION_COST = 50
+        self.DEF_MAX_COST = 2000
 
         # custom kwargs default values
-        self.DEF_D = 0.5
-        self.DEF_S = 200
-        self.DEF_C = (5, 10)
+        self.cosparam = 1
+        self.DEF_D = 0.4
+        self.DEF_S = 10
+        self.DEF_C = 27
         self.DEF_P = 0.9
 
     @staticmethod
@@ -148,15 +140,19 @@ class GridGenerator(BaseGenerator):
             n = []
             
             if row != height-1:
-                n.append((row+1)*height + col)
+                n.append((row+1)*width + col)
             if row != 0:
-                n.append((row-1)*height + col)
+                n.append((row-1)*width + col)
             if col != width-1:
-                n.append(row*height + col + 1)
+                n.append(row*width + col + 1)
             if col != 0:
-                n.append(row*height + col - 1)
+                n.append(row*width + col - 1)
 
             return n
+    
+    @staticmethod
+    def _get_diagonal(maxx, maxy, minx, miny):
+        return np.sqrt((maxx-minx)**2 + (maxy-miny)**2)
 
     def generate(self, size: int | list[int], path: str = None, *args, **kwargs) -> list[str]:
         """
@@ -168,44 +164,87 @@ class GridGenerator(BaseGenerator):
         if type(ret) == list:
             return ret
         
+        _nid_map = {}
+        _nfid = 0
+        def get_id(id):
+            nonlocal _nfid
+            try:
+                return _nid_map[id]
+            except KeyError:
+                nid = _nfid
+                _nfid += 1
+                _nid_map[id] = nid
+                return nid
+            
+        maxx, maxy, minx, miny = None, None, None, None
+        def update_lims(x, y):
+            nonlocal maxx, maxy, minx, miny
+            if maxx is None or x > maxx:
+                maxx = x
+            if maxy is None or y > maxy:
+                maxy = y
+            if minx is None or x < minx:
+                minx = x
+            if miny is None or y < miny:
+                miny = y
+        
         self.d = kwargs.get('d', self.DEF_D)
         self.s = kwargs.get('s', self.DEF_S)
         self.c = kwargs.get('c', self.DEF_C)
         self.p = kwargs.get('p', self.DEF_P)
 
         # deduct the shape
-        max_width = int(size)
-        width = int(self.rng.integers(1, max_width + 1))
-        height = size // width
+        shapes = set()
+        for w in range(max(int(np.sqrt(size)-4), 0), size//2+1):
+            h = size//w
+            shapes.add((w, h))
+        width, height = list(shapes)[self.rng.integers(0, len(shapes))]
 
         # gen graph data
-        graph = {}
+        graph = defaultdict(lambda: defaultdict(list))
         graph['nodes'] = height*width
-        graph['edges'] = height*(width-1) + (height-1)*width
+        edge_count = 0
 
-        for col in range(width):
-            for row in range(height):
-                idx = row*height + col
-                graph[idx] = {}
+        for row in range(height):
+            for col in range(width):
+                idx = row*width + col
                 angle = np.random.uniform(0, 2 * np.pi)
-                radius = float(np.random.uniform(0, self.p*self.s))
-                graph[idx]['x'] = col*self.s + radius * float(np.cos(angle))
-                graph[idx]['y'] = row*self.s + radius * float(np.sin(angle))
-                graph[idx]['adj'] = []
+                radius = float(np.random.uniform(0, self.d*self.s))
+                x = col*self.s + radius * float(np.cos(angle))
+                y = row*self.s + radius * float(np.sin(angle))
+                graph[get_id(idx)]['x'] = x
+                graph[get_id(idx)]['y'] = y
+                update_lims(x, y)
+
+        for row in range(height):
+            for col in range(width):
+                idx = row*width + col
                 for neighbor_idx in self._get_neigbors(row, col, width, height):
                     if self.rng.random() < self.p:
-                        if neighbor_idx not in graph[idx]['adj']:
-                            graph[idx]['adj'].append((neighbor_idx, int(self.rng.integers(self.c[0], self.c[1]))))
-                        if not neighbor_idx in graph:
-                            graph[neighbor_idx] = {}
-                            graph[neighbor_idx]['x'] = (neighbor_idx % height) * self.s
-                            graph[neighbor_idx]['y'] = (neighbor_idx // height) * self.s
-                            graph[neighbor_idx]['adj'] = []
-                        if idx not in graph[neighbor_idx]['adj']:
-                            graph[neighbor_idx]['adj'].append((idx, int(self.rng.integers(self.c[0], self.c[1]))))
+                        
+                        dx = graph[get_id(idx)]['x'] - graph[get_id(neighbor_idx)]['x']
+                        dy = graph[get_id(idx)]['y'] - graph[get_id(neighbor_idx)]['y']
+                        dist = np.sqrt(dx**2 + dy**2)
+
+                        if get_id(neighbor_idx) not in graph[get_id(idx)]['adj']:
+                            graph[get_id(idx)]['adj'].append((get_id(neighbor_idx), dist*float(self.rng.poisson(3))))
+                            edge_count += 1
+                        if get_id(idx) not in graph[get_id(neighbor_idx)]['adj']:
+                            graph[get_id(neighbor_idx)]['adj'].append((get_id(idx), dist*float(self.rng.poisson(3))))
+                            edge_count += 1
+
+        graph['edges'] = edge_count
+
+        diag = float(self._get_diagonal(maxx, maxy, minx, miny))
+        self.time = kwargs.get('time', self.DEF_TIME)
+        self.cost = kwargs.get('cost', self.DEF_COST)
+        self.station_cost = kwargs.get('station_cost', self.DEF_STATION_COST)
+        self.max_cost = kwargs.get('max_cost', diag * self.cost * (1 + self.cosparam) \
+            + ((diag)/(self.s*(1+self.cosparam)))*self.station_cost
+        )
 
         self.save_json(graph, ret)
-        return [self.path]
+        return [ret]
 
 
 class ConsecutiveGenerator(BaseGenerator):
@@ -254,5 +293,9 @@ class ConsecutiveGenerator(BaseGenerator):
 # l systems generators
 
 if __name__ == '__main__':
-    cg = GridGenerator(path=os.path.abspath("../benchmark/test"))
-    cg.generate_batch("tmp", [16, 23], [{'s': 100}, {'s': 300}])
+    cg = GridGenerator(path=os.path.abspath("benchmark/test"))
+    kwargs_set = []
+    for station_cost in range(5000, 10000, 1000):
+        kwargs_set.append({'station_cost': station_cost})
+
+    print(cg.generate_batch("gridParamGrid", [20, 40], kwargs_set))

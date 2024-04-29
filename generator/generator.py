@@ -195,7 +195,7 @@ class GridGenerator(BaseGenerator):
 
         # deduct the shape
         shapes = set()
-        for w in range(max(int(np.sqrt(size)-4), 0), size//2+1):
+        for w in range(max(int(np.sqrt(size)-3), 1), size//2+1):
             h = size//w
             shapes.add((w, h))
         width, height = list(shapes)[self.rng.integers(0, len(shapes))]
@@ -249,37 +249,37 @@ class GridGenerator(BaseGenerator):
 
 class ConsecutiveGenerator(BaseGenerator):
 
-    def __init__(self, seed: int = BASE_SEED, path: str | None = None) -> None:
+    def __init__(self, seed: int = BASE_SEED, path: str | None = None, size: int = 10) -> None:
         if path is None:
             path = os.path.dirname(os.path.realpath(__file__))
         super().__init__(seed=seed, path=path, name="ConsecutiveGenerator")
-
+        self.size = size
         # basic kwargs default values
-        self.DEF_TIME = 5
+        self.DEF_TIME = 0.1
         self.DEF_COST = 10
         self.DEF_STATION_COST = 10
-        self.DEF_MAX_COST = 30
+        self.DEF_MAX_COST = 30 * self.size
 
-    def generate(self, size: int | list[int], path: str = None, *args, **kwargs) -> list[str]:
+    def generate(self, path: str = None, *args, **kwargs) -> list[str]:
         """
         size:
             Defines number of consecutive points
         """
         
-        ret = self._generate_init(size, path, *args, **kwargs)
+        ret = self._generate_init(self.size, path, *args, **kwargs)
         if type(ret) == list:
             return ret
         
         # gen graph data
         graph = {}
-        for i in range(size):
-            graph['nodes'] = size
-            graph['edges'] = 2 * size
+        for i in range(self.size):
+            graph['nodes'] = self.size
+            graph['edges'] = 2 * self.size
             graph[i] = {}
             graph[i]['x'] = i
             graph[i]['y'] = i % 2
             graph[i]['adj'] = []
-            if i < size - 1:
+            if i < self.size - 1:
                 graph[i]['adj'].append((i + 1, np.random.randint(5, 10)))
             if i > 0:
                 graph[i]['adj'].append((i - 1, np.random.randint(5, 10)))
@@ -293,9 +293,8 @@ class ConsecutiveGenerator(BaseGenerator):
 # l systems generators
 
 if __name__ == '__main__':
-    cg = GridGenerator(path=os.path.abspath("benchmark/test"))
-    kwargs_set = []
-    for station_cost in range(5000, 10000, 1000):
-        kwargs_set.append({'station_cost': station_cost})
+    cg = GridGenerator(path=os.path.abspath("../benchmark/test"))
+    cg.generate_batch("tmp", [16, 23], [{'s': 100}, {'s': 300}])
 
-    print(cg.generate_batch("gridParamGrid", [20, 40], kwargs_set))
+    cg = ConsecutiveGenerator(path=os.path.abspath("../benchmark/small"), size = 60)
+    cg.generate(path=os.path.abspath("../benchmark/small/consecutive_30.json"))

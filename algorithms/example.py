@@ -14,7 +14,7 @@ def dist(A, B, G):
     return np.sqrt(metro_dist_x ** 2 + metro_dist_y ** 2)
 
 
-def get_score_cost(G, metro_params, solution):
+def get_score_cost(G, metro_params, solution, only_cost=False):
     score = 0
     total_cost = 0
     G = G.copy()
@@ -27,11 +27,14 @@ def get_score_cost(G, metro_params, solution):
         G.add_edge(solution[i], solution[i + 1], weight=new_weigth)
         G.add_edge(solution[i + 1], solution[i], weight=new_weigth)
         
-        total_cost += len(solution) * metro_params['cost/station']
+    total_cost += len(solution) * metro_params['cost/station']
     
+    if only_cost:
+        return None, total_cost
+
     for node_A in G.nodes:
-        for node_B in G.nodes:
-            score += nx.shortest_path_length(G, node_A, node_B, weight='weight')
+        for _, value in nx.shortest_path_length(G, node_A, weight='weight').items():
+            score += value
     
     return score, total_cost
 
@@ -48,6 +51,7 @@ class BaseAlgo:
         self.best_solution = None
         self.best_score = None
         self.actual_population = None
+        self.actual_scores = None
         self.gif_path = gif_path
         self.metro_params['max_cost'] = max_cost
 
@@ -102,18 +106,20 @@ class BaseAlgo:
         
         for i in tqdm.tqdm(range(iterations)):
             self.actual_population = \
-                self.generate_init_candidates() if i == 0 else self.generate_new_candidates(self.actual_population)
-            scores = []
+                flag = self.generate_init_candidates() if i == 0 else self.generate_new_candidates(self.actual_population, self.actual_scores)
+            if not flag:
+                break
+            self.actual_scores = []
             for candidate in self.actual_population:
                 G = self.G.copy()
                 for _ in range(len(candidate) - 1):    
                     weight = dist(candidate[0], candidate[1], G) * self.metro_params['time/km']
                     G.add_edge(candidate[0], candidate[1], weight=weight)
-                scores.append(get_score_cost(G, self.metro_params, candidate)[0])
+                self.actual_scores.append(get_score_cost(G, self.metro_params, candidate)[0])
 
-            best_sol_idx = scores.index(min(scores))
+            best_sol_idx = self.actual_scores.index(min(self.actual_scores))
             best_sol = self.actual_population[best_sol_idx]
-            best_score = scores[best_sol_idx]
+            best_score = self.actual_scores[best_sol_idx]
             self.current_best_solution = best_sol
             self.current_best_score = best_score
             if visualize:
@@ -131,20 +137,66 @@ class BaseAlgo:
             if verbose == 1:
                 scores_cost = [get_score_cost(self.G, metro_params, candidate) for candidate in self.actual_population]
                 print(scores_cost)
-            
-        if generate_gif:
-            self.generate_gif(self.gif_path, iterations=iterations)
+        
+        self.current_best_score = None
+        self.current_best_solution = None
+        if visualize:
+            self.visualize(save_plot=True, file_path=self.vis_path + 'end',
+                            title = f"Iteration: {i}\nBest Score: {self.best_score}\nCurrent Score: {self.current_best_score}")
 
-    def generate_gif(self, path, iterations=100):
-        images = []
-        for i in range(iterations):
-            images.append(imageio.imread(self.vis_path + str(i).zfill(4) + '.png'))
-        imageio.mimsave(path, images)
+        if save_best:
+            with open(self.sol_path + 'end.sol', 'w') as f:
+                f.write(str(self.best_solution))
+
+        if generate_gif:
+            self.generate_gif(self.vis_path)
+
+    def generate_gif(self, path):
+        import os
+        images = sorted(os.listdir(path))
+        images_path = deepcopy(images)
+        images_gif = []
+        for img in images_path:
+            images_gif.append(imageio.imread(path + '/' + img))
+        imageio.mimsave(self.gif_path, images_gif, fps=1)
 
 
 class UselessAlgo(BaseAlgo):
-    def generate_new_candidates(self, candidates):
+    def generate_new_candidates(self, candidates, scores):
         return self.generate_init_candidates()
+
+
+class BeesAlgo(BaseAlgo):
+    def generate_init_candidates(self, n = 100) -> list:
+        output = []
+        while len(output) < n:
+            u, v = random.sample(range(self.nodes), 2)
+            while u == v or (u, v) in output or (v, u) in output:
+                u, v = random.sample(range(self.nodes), 2)
+            metro_cost = get_score_cost(self.G, self.metro_params, [u, v])[1]
+            if metro_cost < self.metro_params['max_cost']:
+                output.append([u, v])
+        return output
+
+
+    def generate_new_candidates(self, candidates, scores, m = 1000):
+        g_scores = np.array(scores)
+        g_scores = 1 / g_scores
+        g_scores = g_scores / g_scores.sum()
+        output = []
+        it = 0
+        while len(output) < m and it < 100000:
+            tmp = deepcopy(candidates[np.random.choice(range(len(candidates)), p=g_scores)])
+            new_vertex = random.randint(0, self.nodes - 1)
+            while new_vertex in tmp:
+                new_vertex = random.randint(0, self.nodes - 1)
+            tmp.append(new_vertex)
+            metro_cost = get_score_cost(self.G, self.metro_params, tmp, only_cost=True)[1]
+            if metro_cost <= self.metro_params['max_cost'] and tmp not in output:
+                output.append(tmp)
+            it += 1
+
+        return output if len(output) > 0 else None
 
 
 if __name__ == '__main__':
@@ -165,6 +217,6 @@ if __name__ == '__main__':
 
     G = load_graph('/home/rusiek/Studia/vi_sem/New-Metro-Line/benchmark/test/GridGenerator_tmp_0_16.json')
     metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
-    algo = UselessAlgo(G, metro_params, vis_path='visualizations/vis', sol_path='solutions/sol')
+    algo = BeesAlgo(G, metro_params, vis_path='vis/vis', sol_path='sol/sol', gif_path='solution.gif')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
-    # print(algo.best_solution)
+    print(algo.best_solution)

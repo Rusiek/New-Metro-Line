@@ -40,7 +40,7 @@ def get_score_cost(G, metro_params, solution, only_cost=False):
 
 
 class BaseAlgo:
-    def __init__(self, G, metro_params, max_cost=float('inf'), vis_path=None, sol_path=None, gif_path=None):
+    def __init__(self, G, metro_params, algo_params, max_cost=float('inf'), vis_path=None, sol_path=None, gif_path=None):
         self.G = G
         self.metro_params = metro_params
         self.nodes = len(G.nodes)
@@ -54,10 +54,13 @@ class BaseAlgo:
         self.actual_scores = None
         self.gif_path = gif_path
         self.metro_params['max_cost'] = max_cost
+        self.num_initial_candidates = algo_params['num_initial_candidates']
+        self.num_new_candidates = algo_params['num_new_candidates']
+        self.randomness_factor = algo_params['randomness_factor']
 
-    def generate_init_candidates(self, n = 10) -> list:
+    def generate_init_candidates(self) -> list:
         output = []
-        while len(output) < n:
+        while len(output) < self.num_initial_candidates:
             tmp = [i for i in range(self.nodes)]
             random.shuffle(tmp)
             tmp = tmp[:random.randint(2, self.nodes)]
@@ -66,7 +69,7 @@ class BaseAlgo:
                 output.append(tmp)
         return output
 
-    def generate_new_candidates(self, candidates: list) -> list:
+    def generate_new_candidates(self, candidates: list, scores: list) -> list | None:
         ...
  
     def visualize(self, save_plot=False, file_path=None, title=None, **kwargs):
@@ -167,9 +170,9 @@ class UselessAlgo(BaseAlgo):
 
 
 class BeesAlgo(BaseAlgo):
-    def generate_init_candidates(self, n = 100) -> list:
+    def generate_init_candidates(self) -> list:
         output = []
-        while len(output) < n:
+        while len(output) < self.num_initial_candidates:
             u, v = random.sample(range(self.nodes), 2)
             while u == v or (u, v) in output or (v, u) in output:
                 u, v = random.sample(range(self.nodes), 2)
@@ -179,13 +182,14 @@ class BeesAlgo(BaseAlgo):
         return output
 
 
-    def generate_new_candidates(self, candidates, scores, m = 1000):
+    def generate_new_candidates(self, candidates, scores):
         g_scores = np.array(scores)
         g_scores = 1 / g_scores
+        g_scores = np.power(g_scores, self.randomness_factor)
         g_scores = g_scores / g_scores.sum()
         output = []
         it = 0
-        while len(output) < m and it < 100000:
+        while len(output) < self.num_new_candidates and it < 100000:
             tmp = deepcopy(candidates[np.random.choice(range(len(candidates)), p=g_scores)])
             new_vertex = random.randint(0, self.nodes - 1)
             while new_vertex in tmp:
@@ -217,6 +221,7 @@ if __name__ == '__main__':
 
     G = load_graph('/home/rusiek/Studia/vi_sem/New-Metro-Line/benchmark/test/GridGenerator_tmp_0_16.json')
     metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
-    algo = BeesAlgo(G, metro_params, vis_path='vis/vis', sol_path='sol/sol', gif_path='solution.gif')
+    algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1}
+    algo = BeesAlgo(G, metro_params, algo_params, vis_path='vis/vis', sol_path='sol/sol', gif_path='solution.gif')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
     print(algo.best_solution)

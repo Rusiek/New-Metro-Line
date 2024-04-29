@@ -39,7 +39,8 @@ if __name__ == '__main__':
 
     gif_path = sys.argv[1].split('.')[0] + '/solution.gif'
 
-    algo = BeesAlgo(G, metro, max_cost=max_cost, vis_path=vis_path, sol_path=sol_path, gif_path=gif_path)
+    algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1}
+    algo = BeesAlgo(G, metro, algo_params, max_cost=max_cost, vis_path=vis_path, sol_path=sol_path, gif_path=gif_path)
     algo.run(visualize=True, save_best=True, generate_gif=True, verbose=0)
     solution = algo.best_solution
     output = worker.evaluate(solution)

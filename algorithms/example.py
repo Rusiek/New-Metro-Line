@@ -1,6 +1,7 @@
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 import random
 import tqdm
 import imageio.v2 as imageio
@@ -57,6 +58,8 @@ class BaseAlgo:
         self.num_initial_candidates = algo_params['num_initial_candidates']
         self.num_new_candidates = algo_params['num_new_candidates']
         self.randomness_factor = algo_params['randomness_factor']
+        self.min_w = algo_params['min_w']
+        self.max_w = algo_params['max_w']
 
     def generate_init_candidates(self) -> list:
         output = []
@@ -74,6 +77,8 @@ class BaseAlgo:
  
     def visualize(self, save_plot=False, file_path=None, title=None, **kwargs):
         plt.figure(figsize=(10, 10))
+        cmap = plt.get_cmap('viridis')
+        norm = Normalize(vmin=self.min_w, vmax=self.max_w)
         
         if title:
             plt.title(title)
@@ -83,7 +88,7 @@ class BaseAlgo:
         
         for edge in self.G.edges:
             u, v = edge
-            plt.plot([self.G.nodes[u]['x'], self.G.nodes[v]['x']], [self.G.nodes[u]['y'], self.G.nodes[v]['y']], color='black')
+            plt.plot([self.G.nodes[u]['x'], self.G.nodes[v]['x']], [self.G.nodes[u]['y'], self.G.nodes[v]['y']], color=cmap(norm(self.G.get_edge_data(u, v)['weight'])))
         
         if self.best_solution:
             for i in range(len(self.best_solution) - 1):
@@ -217,11 +222,11 @@ if __name__ == '__main__':
             for j, w in graph[str(i)]['adj']:
                 G.add_edge(i, j, weight=w)
 
-        return G
+        return G, graph['generator']['min_w'], graph['generator']['max_w']
 
-    G = load_graph('/home/rusiek/Studia/vi_sem/New-Metro-Line/benchmark/test/GridGenerator_tmp_0_16.json')
+    G, min_w, max_w = load_graph('/home/piotr/stdia/BO_SEM6/New-Metro-Line/benchmark/test/GridGenerator_tmp_0_16.json')
     metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
-    algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1}
+    algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1, 'min_w': min_w, 'max_w': max_w}
     algo = BeesAlgo(G, metro_params, algo_params, vis_path='vis/vis', sol_path='sol/sol', gif_path='solution.gif')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
     print(algo.best_solution)

@@ -7,6 +7,12 @@ from collections import defaultdict
 BASE_SEED = 129348
 
 
+def in_adj(idx: int, adj: list) -> bool:
+    for sadj in adj:
+        if idx == sadj[0]:
+            return True
+    return False
+
 class BaseGenerator(ABC):
 
     def __init__(self, seed: int, path: str, name: str) -> None:
@@ -204,6 +210,17 @@ class GridGenerator(BaseGenerator):
         graph = defaultdict(lambda: defaultdict(list))
         graph['nodes'] = height*width
         edge_count = 0
+        min_w, max_w = None, None
+        def update_minmax(nv):
+            nonlocal min_w, max_w
+            if min_w is None:
+                min_w = nv
+            if max_w is None:
+                max_w = nv
+            if nv < min_w:
+                min_w = nv
+            if nv > max_w:
+                max_w = nv
 
         for row in range(height):
             for col in range(width):
@@ -226,11 +243,15 @@ class GridGenerator(BaseGenerator):
                         dy = graph[get_id(idx)]['y'] - graph[get_id(neighbor_idx)]['y']
                         dist = np.sqrt(dx**2 + dy**2)
 
-                        if get_id(neighbor_idx) not in graph[get_id(idx)]['adj']:
-                            graph[get_id(idx)]['adj'].append((get_id(neighbor_idx), dist*float(self.rng.poisson(3))))
+                        if not in_adj(get_id(neighbor_idx), graph[get_id(idx)]['adj']):
+                            rdm_dist = dist*float(self.rng.poisson(3))
+                            update_minmax(rdm_dist)
+                            graph[get_id(idx)]['adj'].append((get_id(neighbor_idx), rdm_dist))
                             edge_count += 1
-                        if get_id(idx) not in graph[get_id(neighbor_idx)]['adj']:
-                            graph[get_id(neighbor_idx)]['adj'].append((get_id(idx), dist*float(self.rng.poisson(3))))
+                        if not in_adj(get_id(idx), graph[get_id(neighbor_idx)]['adj']):
+                            rdm_dist = dist*float(self.rng.poisson(3))
+                            update_minmax(rdm_dist)
+                            graph[get_id(neighbor_idx)]['adj'].append((get_id(idx), rdm_dist))
                             edge_count += 1
 
         graph['edges'] = edge_count
@@ -242,6 +263,8 @@ class GridGenerator(BaseGenerator):
         self.max_cost = kwargs.get('max_cost', diag * self.cost * (1 + self.cosparam) \
             + ((diag)/(self.s*(1+self.cosparam)))*self.station_cost
         )
+
+        graph['generator'] = {'min_w': min_w, 'max_w': max_w}
 
         self.save_json(graph, ret)
         return [ret]
@@ -293,8 +316,8 @@ class ConsecutiveGenerator(BaseGenerator):
 # l systems generators
 
 if __name__ == '__main__':
-    cg = GridGenerator(path=os.path.abspath("../benchmark/test"))
+    cg = GridGenerator(path=os.path.abspath("benchmark/test"))
     cg.generate_batch("tmp", [16, 23], [{'s': 100}, {'s': 300}])
 
-    cg = ConsecutiveGenerator(path=os.path.abspath("../benchmark/small"), size = 60)
-    cg.generate(path=os.path.abspath("../benchmark/small/consecutive_30.json"))
+    # cg = ConsecutiveGenerator(path=os.path.abspath("../benchmark/small"), size = 60)
+    # cg.generate(path=os.path.abspath("../benchmark/small/consecutive_30.json"))

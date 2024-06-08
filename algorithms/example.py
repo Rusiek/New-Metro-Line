@@ -27,16 +27,16 @@ def get_score_cost(G, metro_params, solution, only_cost=False):
 
         G.add_edge(solution[i], solution[i + 1], weight=new_weigth)
         G.add_edge(solution[i + 1], solution[i], weight=new_weigth)
-        
+
     total_cost += len(solution) * metro_params['cost/station']
-    
+
     if only_cost:
         return None, total_cost
 
     for node_A in G.nodes:
         for _, value in nx.shortest_path_length(G, node_A, weight='weight').items():
             score += value
-    
+
     return score, total_cost
 
 
@@ -74,22 +74,22 @@ class BaseAlgo:
 
     def generate_new_candidates(self, candidates: list, scores: list) -> list | None:
         ...
- 
+
     def visualize(self, save_plot=False, file_path=None, title=None, **kwargs):
         plt.figure(figsize=(10, 10))
         cmap = plt.get_cmap('viridis')
         norm = Normalize(vmin=self.min_w, vmax=self.max_w)
-        
+
         if title:
             plt.title(title)
 
         for node in self.G.nodes:
             plt.scatter(self.G.nodes[node]['x'], self.G.nodes[node]['y'], color='black')
-        
+
         for edge in self.G.edges:
             u, v = edge
             plt.plot([self.G.nodes[u]['x'], self.G.nodes[v]['x']], [self.G.nodes[u]['y'], self.G.nodes[v]['y']], color=cmap(norm(self.G.get_edge_data(u, v)['weight'])))
-        
+
         if self.best_solution:
             for i in range(len(self.best_solution) - 1):
                 u, v = self.best_solution[i], self.best_solution[i + 1]
@@ -111,16 +111,19 @@ class BaseAlgo:
             raise ValueError("Visualization path is not provided")
         if save_best and self.sol_path is None:
             raise ValueError("Solution path is not provided")
-        
-        for i in tqdm.tqdm(range(iterations)):
+
+        progress_bar = tqdm.tqdm(range(iterations))
+
+        for i in progress_bar:
             self.actual_population = \
                 flag = self.generate_init_candidates() if i == 0 else self.generate_new_candidates(self.actual_population, self.actual_scores)
             if not flag:
+                tqdm.tqdm.close(progress_bar)
                 break
             self.actual_scores = []
             for candidate in self.actual_population:
                 G = self.G.copy()
-                for _ in range(len(candidate) - 1):    
+                for _ in range(len(candidate) - 1):
                     weight = dist(candidate[0], candidate[1], G) * self.metro_params['time/km']
                     G.add_edge(candidate[0], candidate[1], weight=weight)
                 self.actual_scores.append(get_score_cost(G, self.metro_params, candidate)[0])
@@ -137,15 +140,15 @@ class BaseAlgo:
             if self.best_solution is None or best_score < self.best_score:
                 self.best_solution = best_sol
                 self.best_score = best_score
-            
+
             if save_best:
                 with open(self.sol_path + str(i).zfill(4) + '.sol', 'w') as f:
                     f.write(str(best_sol))
-        
+
             if verbose == 1:
                 scores_cost = [get_score_cost(self.G, metro_params, candidate) for candidate in self.actual_population]
                 print(scores_cost)
-        
+
         self.current_best_score = None
         self.current_best_solution = None
         if visualize:
@@ -210,14 +213,100 @@ class BeesAlgo(BaseAlgo):
         return output if len(output) > 0 else None
 
 
+class CSOAlgo(BaseAlgo):
+    def __init__(self, G, metro_params, algo_params,
+                 visual_range,
+                 inertia_coefficient,
+                 step,
+                 max_cost,
+                 vis_path,
+                 sol_path,
+                 gif_path
+                 ):
+        super().__init__(G, metro_params, algo_params, max_cost=max_cost,
+                 vis_path=vis_path,
+                 sol_path=sol_path,
+                 gif_path=gif_path)
+        self.visual_range = visual_range
+        self.inertia_coefficient = inertia_coefficient
+        self.step = step
+
+    def generate_init_candidates(self) -> list:
+        output = []
+        while len(output) < self.num_initial_candidates:
+            tmp = [i for i in range(self.nodes)]
+            random.shuffle(tmp)
+            tmp = tmp[:random.randint(2, 3)]
+            metro_cost = get_score_cost(self.G, self.metro_params, tmp)[1]
+            if metro_cost < self.metro_params['max_cost']:
+                output.append(tmp)
+        return output
+
+    def generate_new_candidates(self, candidates: list, scores: list) -> list | None:
+        Pg = None
+        Pg_score = None
+        Pi_list = []
+        def recalculate_best_score(candidate):
+            nonlocal Pg, Pg_score
+            can_score = get_score_cost(self.G, self.metro_params, candidate)[0]
+            if not Pg or Pg_score > can_score:
+                Pg = candidate
+                Pg_score = can_score
+
+        for candidate in candidates:
+            Pi = candidate
+            recalculate_best_score(candidate)
+
+            for second_candidate in candidates:
+                first_can_set = set(candidate)
+                second_can_set = set(second_candidate)
+                if len(first_can_set - second_can_set) < self.visual_range:
+                    recalculate_best_score(second_candidate)
+
+            Pi_list.append(Pi)
+
+        for candidate, Pi in zip(candidates, Pi_list):
+
+            if not random.randint(0, 1):
+                continue
+
+            currBest = Pi
+            if candidate == Pi:
+                currBest = Pg
+            stops = list(set(currBest) - set(candidate))
+            for curr_step in range(min(self.step, len(stops))):
+                cost_if_added = get_score_cost(self.G, self.metro_params, candidate + [stops[curr_step]], True)[1]
+                if cost_if_added < self.metro_params['max_cost']:
+                    candidate.append(stops[curr_step])
+
+            recalculate_best_score(candidate)
+
+        candidate = random.choice(candidates)
+        candidate[random.randint(0, len(candidate) - 1)] = random.randint(1, self.nodes - 1)
+
+        recalculate_best_score(candidate)
+
+        candidate_id = random.choice([i for i in range(0, len(candidates))])
+
+        if random.randint(0, 1):
+            candidates[candidate_id] = Pg.copy()
+
+        else:
+            candidates[candidate_id] = [candidates[candidate_id][-1]]
+        recalculate_best_score(candidate)
+
+        return candidates
+
+
+
 if __name__ == '__main__':
     import json
     def load_graph(path: str):
         with open(path, 'r') as f:
             json_data = json.load(f)
-        
+
         graph = json_data['graph']
-        
+
         G = nx.DiGraph()
         for i in range(graph['nodes']):
             G.add_node(i, x=graph[str(i)]['x'], y=graph[str(i)]['y'])
@@ -226,9 +315,16 @@ if __name__ == '__main__':
 
         return G, graph['generator']['min_w'], graph['generator']['max_w'], json_data['metro'], json_data['max_cost']
 
-    G, min_w, max_w, metro_params, max_cost = load_graph('/home/piotr/stdia/BO_SEM6/New-Metro-Line/benchmark/test/ClustersGridGenerator_tmp_1_60.json')
+    G, min_w, max_w, metro_params, max_cost = load_graph('C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\generator\\benchmark\\test\\ClustersGridGenerator_tmp_1_60.json')
     # metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
     algo_params = {'num_initial_candidates': 200, 'num_new_candidates': 2000, 'randomness_factor': 1.1, 'min_w': min_w, 'max_w': max_w}
-    algo = BeesAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='/home/piotr/stdia/BO_SEM6/New-Metro-Line/vis/', sol_path='/home/piotr/stdia/BO_SEM6/New-Metro-Line/sol/', gif_path='solution.gif')
+    algo = BeesAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\vis\\', sol_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\sol\\', gif_path='solution.gif')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
     print(algo.best_solution)
+
+    # algo = CSOAlgo(G, metro_params, algo_params, 2, 2, 1,
+    #                max_cost=max_cost,
+    #                vis_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\vis\\',
+    #                sol_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\sol\\',
+    #                gif_path='solution.gif')
+    # algo.run(iterations=15, visualize=True, save_best=True, generate_gif=True, verbose=0)

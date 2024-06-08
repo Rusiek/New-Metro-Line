@@ -400,10 +400,11 @@ class ClustersGridGenerator(BaseGenerator):
 
         plt.imshow(population_density, cmap='hot')
         plt.colorbar(label='Population Density')
+        plt.gca().invert_yaxis()
 
         # deduct the shape
         shapes = set()
-        for w in range(max(int(np.sqrt(size)-3), 1), size//2+1):
+        for w in range(max(int(np.sqrt(size)-3), 1), max(int(np.sqrt(size)-3), 1) + 2):
             h = size//w
             shapes.add((w, h))
         width, height = list(shapes)[self.rng.integers(0, len(shapes))]
@@ -446,7 +447,7 @@ class ClustersGridGenerator(BaseGenerator):
                         y = graph[get_id(idx)]['y']
                         ny = graph[get_id(neighbor_idx)]['y']
                         dist = np.sqrt((x - nx)**2 + (y - ny)**2)
-                        rdm_dist = dist*(population_density[int(_hmn_x(x)), int(_hmn_y(y))] + population_density[int(_hmn_x(nx)), int(_hmn_y(ny))])/2 + dist*self.time*1.5
+                        rdm_dist = dist*(population_density[int(_hmn_x(x)), int(_hmn_y(y))] + population_density[int(_hmn_x(nx)), int(_hmn_y(ny))])/2 + dist*self.time*2
 
                         if not in_adj(get_id(neighbor_idx), graph[get_id(idx)]['adj']):
                             update_minmax(rdm_dist)
@@ -519,7 +520,7 @@ class ConsecutiveGenerator(BaseGenerator):
 
 if __name__ == '__main__':
     cg = ClustersGridGenerator(path=os.path.abspath("benchmark/test"))
-    cg.generate_batch("tmp", [16, 23], [{'s': 100}, {'s': 300}])
+    cg.generate_batch("tmp", [40, 60], [{'s': 100}, {'s': 300}])
 
     # cg = ConsecutiveGenerator(path=os.path.abspath("../benchmark/small"), size = 60)
     # cg.generate(path=os.path.abspath("../benchmark/small/consecutive_30.json"))

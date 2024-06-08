@@ -93,7 +93,7 @@ class BaseAlgo:
         if self.best_solution:
             for i in range(len(self.best_solution) - 1):
                 u, v = self.best_solution[i], self.best_solution[i + 1]
-                plt.plot([self.G.nodes[u]['x'], self.G.nodes[v]['x']], [self.G.nodes[u]['y'], self.G.nodes[v]['y']], color='green')
+                plt.plot([self.G.nodes[u]['x'], self.G.nodes[v]['x']], [self.G.nodes[u]['y'], self.G.nodes[v]['y']], color='green', linewidth=5)
 
         if self.current_best_solution:
             for i in range(len(self.current_best_solution) - 1):
@@ -194,9 +194,11 @@ class BeesAlgo(BaseAlgo):
         g_scores = g_scores / g_scores.sum()
         output = []
         it = 0
-        while len(output) < self.num_new_candidates and it < 100000:
+        while len(output) < self.num_new_candidates and it < 1000:
             tmp = deepcopy(candidates[np.random.choice(range(len(candidates)), p=g_scores)])
             new_vertex = random.randint(0, self.nodes - 1)
+            if len(tmp) == self.nodes:
+                return output
             while new_vertex in tmp:
                 new_vertex = random.randint(0, self.nodes - 1)
             tmp.append(new_vertex)
@@ -222,11 +224,11 @@ if __name__ == '__main__':
             for j, w in graph[str(i)]['adj']:
                 G.add_edge(i, j, weight=w)
 
-        return G, graph['generator']['min_w'], graph['generator']['max_w']
+        return G, graph['generator']['min_w'], graph['generator']['max_w'], json_data['metro'], json_data['max_cost']
 
-    G, min_w, max_w = load_graph('/home/piotr/stdia/BO_SEM6/New-Metro-Line/benchmark/test/GridGenerator_tmp_0_16.json')
-    metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
+    G, min_w, max_w, metro_params, max_cost = load_graph('/home/piotr/stdia/BO_SEM6/New-Metro-Line/benchmark/test/ClustersGridGenerator_tmp_0_23.json')
+    # metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
     algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1, 'min_w': min_w, 'max_w': max_w}
-    algo = BeesAlgo(G, metro_params, algo_params, vis_path='vis/vis', sol_path='sol/sol', gif_path='solution.gif')
+    algo = BeesAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='/home/piotr/stdia/BO_SEM6/New-Metro-Line/vis/', sol_path='/home/piotr/stdia/BO_SEM6/New-Metro-Line/sol/', gif_path='solution.gif')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
     print(algo.best_solution)

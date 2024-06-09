@@ -7,6 +7,7 @@ import tqdm
 import imageio.v2 as imageio
 from inspect import signature
 from copy import deepcopy
+import random
 
 
 def dist(A, B, G):
@@ -57,9 +58,13 @@ class BaseAlgo:
         self.metro_params['max_cost'] = max_cost
         self.num_initial_candidates = algo_params['num_initial_candidates']
         self.num_new_candidates = algo_params['num_new_candidates']
-        self.randomness_factor = algo_params['randomness_factor']
+        self.randomness_factor = algo_params.get('randomness_factor', 1)
         self.min_w = algo_params['min_w']
         self.max_w = algo_params['max_w']
+        self.stagnated_generations = 0
+        self.stagnation_limit = algo_params.get('stagnation_limit', 3)
+        self.elite_fraction = algo_params.get('elite_fraction', 0.1)
+        self.mutation_rate = algo_params.get('mutation_rate', 0.5)
 
     def generate_init_candidates(self) -> list:
         output = []
@@ -140,6 +145,9 @@ class BaseAlgo:
             if self.best_solution is None or best_score < self.best_score:
                 self.best_solution = best_sol
                 self.best_score = best_score
+                self.stagnated_generations = 0
+            else:
+                self.stagnated_generations += 1
 
             if save_best:
                 with open(self.sol_path + str(i).zfill(4) + '.sol', 'w') as f:
@@ -298,6 +306,72 @@ class CSOAlgo(BaseAlgo):
         return candidates
 
 
+class GeneticAlgo(BaseAlgo):
+
+    def generate_init_candidates(self) -> list:
+        output = []
+        while len(output) < self.num_initial_candidates:
+            nodes = list(G.nodes)
+            random.shuffle(nodes)
+
+            random_path = []
+            metro_cost = 0
+            while nodes and metro_cost < self.metro_params['max_cost']:
+                element = nodes.pop(0)
+                random_path.append(element)
+                metro_cost = get_score_cost(self.G, self.metro_params, random_path, only_cost=True)[1]
+
+            random_path.pop()
+            output.append(random_path)
+
+        return output
+
+    def generate_new_candidates(self, candidates, scores):
+        new_candidates = []
+
+        def crossover(parent1, parent2):
+            crossover_point = random.randint(0, min(len(parent1), len(parent2)))
+            child1 = parent1[:crossover_point] + [x for x in parent2 if x not in parent1[:crossover_point]]
+            child2 = parent2[:crossover_point] + [x for x in parent1 if x not in parent2[:crossover_point]]
+            return child1, child2
+
+        def mutate(candidate):
+            while random.random() < self.mutation_rate:
+                available_nodes = list(set(G.nodes) - set(candidate))
+                candidate_index = random.sample(range(len(candidate)), 1)[0]
+                new_node = random.sample(available_nodes, 1)[0]
+
+                candidate[candidate_index] = new_node
+
+            return candidate
+
+        sorted_candidates = [candidate for _, candidate in sorted(zip(scores, candidates))]
+        elite_count = int(self.elite_fraction * len(sorted_candidates))
+        elite_candidates = sorted_candidates[:elite_count]
+
+        it = 0
+        while len(new_candidates) < self.num_new_candidates:
+            parent1, parent2 = random.sample(elite_candidates, 2)
+            child1, child2 = crossover(parent1, parent2)
+            child1 = mutate(child1)
+            child2 = mutate(child2)
+
+            for child in [child1, child2]:
+                metro_cost = get_score_cost(self.G, self.metro_params, child, only_cost=True)[1]
+                if it > self.num_new_candidates * 10:
+                    while metro_cost > self.metro_params['max_cost']:
+                        child.pop()
+                        metro_cost = get_score_cost(self.G, self.metro_params, child, only_cost=True)[1]
+
+                if metro_cost <= self.metro_params['max_cost'] and child not in new_candidates:
+                    new_candidates.append(child)
+            it += 1
+
+        if self.stagnated_generations == self.stagnation_limit:
+            return None
+
+        return new_candidates if new_candidates else None
+
 
 if __name__ == '__main__':
     import json
@@ -319,6 +393,11 @@ if __name__ == '__main__':
     # metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
     algo_params = {'num_initial_candidates': 200, 'num_new_candidates': 2000, 'randomness_factor': 1.1, 'min_w': min_w, 'max_w': max_w}
     algo = BeesAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\vis\\', sol_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\sol\\', gif_path='solution.gif')
+    # G, min_w, max_w, metro_params, max_cost = load_graph('ClustersGridGenerator_tmp_0_60.json')
+    # algo_params = {'num_initial_candidates': 200, 'num_new_candidates': 200, 'min_w': min_w, 'max_w': max_w,
+    #                'stagnation_limit': 4, 'elite_fraction': 0.2, 'mutation_rate': 0.25}
+    # algo = GeneticAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='vis/', sol_path='sol/',
+    #                    gif_path='solution.gif')
     algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
     print(algo.best_solution)
 

@@ -1,6 +1,6 @@
 import sys
 import os
-from algorithms.example import BeesAlgo
+from algorithms.algorithms import BeesAlgo
 from benchmark.evaluate import Evaluate
 from loader import load_graph, load_constraints, load_metro_params, load_generator_data
 

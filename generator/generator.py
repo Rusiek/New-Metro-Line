@@ -6,6 +6,7 @@ from collections import defaultdict
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 
+
 BASE_SEED = 129348
 
 
@@ -474,54 +475,6 @@ class ClustersGridGenerator(BaseGenerator):
         return [ret]
 
 
-class ConsecutiveGenerator(BaseGenerator):
-
-    def __init__(self, seed: int = BASE_SEED, path: str | None = None, size: int = 10) -> None:
-        if path is None:
-            path = os.path.dirname(os.path.realpath(__file__))
-        super().__init__(seed=seed, path=path, name="ConsecutiveGenerator")
-        self.size = size
-        # basic kwargs default values
-        self.DEF_TIME = 0.1
-        self.DEF_COST = 10
-        self.DEF_STATION_COST = 10
-        self.DEF_MAX_COST = 30 * self.size
-
-    def generate(self, path: str = None, *args, **kwargs) -> list[str]:
-        """
-        size:
-            Defines number of consecutive points
-        """
-        
-        ret = self._generate_init(self.size, path, *args, **kwargs)
-        if type(ret) == list:
-            return ret
-        
-        # gen graph data
-        graph = {}
-        for i in range(self.size):
-            graph['nodes'] = self.size
-            graph['edges'] = 2 * self.size
-            graph[i] = {}
-            graph[i]['x'] = i
-            graph[i]['y'] = i % 2
-            graph[i]['adj'] = []
-            if i < self.size - 1:
-                graph[i]['adj'].append((i + 1, np.random.randint(5, 10)))
-            if i > 0:
-                graph[i]['adj'].append((i - 1, np.random.randint(5, 10)))
-
-        self.save_json(graph, ret)
-        return [self.path]
-
-# voronoi graphs generator?
-# fractals graphs generator?
-# https://www.tmwhere.com/city_generation.html
-# l systems generators
-
 if __name__ == '__main__':
     cg = ClustersGridGenerator(path=os.path.abspath("benchmark/test"))
-    cg.generate_batch("tmp", [40, 60], [{'s': 100, 'p': 0.8}, {'s': 300, 'p': 0.8}])
-
-    # cg = ConsecutiveGenerator(path=os.path.abspath("../benchmark/small"), size = 60)
-    # cg.generate(path=os.path.abspath("../benchmark/small/consecutive_30.json"))
+    cg.generate_batch("exampleBatch", [40, 60], [{'s': 100, 'p': 0.8}, {'s': 300, 'p': 0.8}])

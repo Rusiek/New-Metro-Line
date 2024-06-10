@@ -5,7 +5,6 @@ from matplotlib.colors import Normalize
 import random
 import tqdm
 import imageio.v2 as imageio
-from inspect import signature
 from copy import deepcopy
 import random
 
@@ -178,12 +177,6 @@ class BaseAlgo:
         for img in images_path:
             images_gif.append(imageio.imread(path + '/' + img))
         imageio.mimsave(self.gif_path, images_gif, fps=1)
-
-
-class UselessAlgo(BaseAlgo):
-    def generate_new_candidates(self, candidates, scores):
-        return self.generate_init_candidates()
-
 
 class BeesAlgo(BaseAlgo):
     def generate_init_candidates(self) -> list:
@@ -361,38 +354,3 @@ class GeneticAlgo(BaseAlgo):
             return None
 
         return new_candidates if new_candidates else None
-
-if __name__ == '__main__':
-    import json
-    def load_graph(path: str):
-        with open(path, 'r') as f:
-            json_data = json.load(f)
-
-        graph = json_data['graph']
-
-        G = nx.DiGraph()
-        for i in range(graph['nodes']):
-            G.add_node(i, x=graph[str(i)]['x'], y=graph[str(i)]['y'])
-            for j, w in graph[str(i)]['adj']:
-                G.add_edge(i, j, weight=w)
-
-        return G, graph['generator']['min_w'], graph['generator']['max_w'], json_data['metro'], json_data['max_cost']
-
-    G, min_w, max_w, metro_params, max_cost = load_graph('C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\generator\\benchmark\\test\\ClustersGridGenerator_tmp_1_60.json')
-    # metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
-    algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1, 'min_w': min_w, 'max_w': max_w}
-    algo = BeesAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\vis\\', sol_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\sol\\', gif_path='solution.gif')
-    # G, min_w, max_w, metro_params, max_cost = load_graph('ClustersGridGenerator_tmp_0_60.json')
-    # algo_params = {'num_initial_candidates': 200, 'num_new_candidates': 200, 'min_w': min_w, 'max_w': max_w,
-    #                'stagnation_limit': 4, 'elite_fraction': 0.2, 'mutation_rate': 0.25}
-    # algo = GeneticAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='vis/', sol_path='sol/',
-    #                    gif_path='solution.gif')
-    algo.run(iterations=100, visualize=True, save_best=True, generate_gif=True, verbose=0)
-    print(algo.best_solution)
-
-    # algo = CSOAlgo(G, metro_params, algo_params, 2, 2, 1,
-    #                max_cost=max_cost,
-    #                vis_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\vis\\',
-    #                sol_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\sol\\',
-    #                gif_path='solution.gif')
-    # algo.run(iterations=15, visualize=True, save_best=True, generate_gif=True, verbose=0)

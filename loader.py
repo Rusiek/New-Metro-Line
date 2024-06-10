@@ -23,6 +23,10 @@ def load_constraints(path: str):
 
     return json_data['max_cost']
 
+def load_generator_data(path: str):
+    with open(path, 'r') as f:
+        json_data = json.load(f)
+    return json_data['graph']['generator']['min_w'], json_data['graph']['generator']['max_w']
 
 def load_metro_params(path: str):
     with open(path, 'r') as f:

@@ -222,22 +222,12 @@ class BeesAlgo(BaseAlgo):
 
 
 class CSOAlgo(BaseAlgo):
-    def __init__(self, G, metro_params, algo_params,
-                 visual_range,
-                 inertia_coefficient,
-                 step,
-                 max_cost,
-                 vis_path,
-                 sol_path,
-                 gif_path
-                 ):
-        super().__init__(G, metro_params, algo_params, max_cost=max_cost,
-                 vis_path=vis_path,
-                 sol_path=sol_path,
-                 gif_path=gif_path)
-        self.visual_range = visual_range
-        self.inertia_coefficient = inertia_coefficient
-        self.step = step
+
+    def __init__(self, G, metro_params, algo_params, max_cost, vis_path, sol_path, gif_path):
+        super().__init__(G, metro_params, algo_params, max_cost=max_cost, vis_path=vis_path, sol_path=sol_path, gif_path=gif_path)
+        self.visual_range = algo_params['visual_range']
+        self.inertia_coefficient = algo_params['inertia_coefficient']
+        self.step = algo_params['step']
 
     def generate_init_candidates(self) -> list:
         output = []
@@ -311,7 +301,7 @@ class GeneticAlgo(BaseAlgo):
     def generate_init_candidates(self) -> list:
         output = []
         while len(output) < self.num_initial_candidates:
-            nodes = list(G.nodes)
+            nodes = list(self.G.nodes)
             random.shuffle(nodes)
 
             random_path = []
@@ -337,7 +327,7 @@ class GeneticAlgo(BaseAlgo):
 
         def mutate(candidate):
             while random.random() < self.mutation_rate:
-                available_nodes = list(set(G.nodes) - set(candidate))
+                available_nodes = list(set(self.G.nodes) - set(candidate))
                 candidate_index = random.sample(range(len(candidate)), 1)[0]
                 new_node = random.sample(available_nodes, 1)[0]
 
@@ -372,7 +362,6 @@ class GeneticAlgo(BaseAlgo):
 
         return new_candidates if new_candidates else None
 
-
 if __name__ == '__main__':
     import json
     def load_graph(path: str):
@@ -391,7 +380,7 @@ if __name__ == '__main__':
 
     G, min_w, max_w, metro_params, max_cost = load_graph('C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\generator\\benchmark\\test\\ClustersGridGenerator_tmp_1_60.json')
     # metro_params = {'time/km': 0.1, 'cost/km': 10, 'cost/station': 10}
-    algo_params = {'num_initial_candidates': 200, 'num_new_candidates': 2000, 'randomness_factor': 1.1, 'min_w': min_w, 'max_w': max_w}
+    algo_params = {'num_initial_candidates': 100, 'num_new_candidates': 1000, 'randomness_factor': 1, 'min_w': min_w, 'max_w': max_w}
     algo = BeesAlgo(G, metro_params, algo_params, max_cost=max_cost, vis_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\vis\\', sol_path='C:\\Users\\Wojtek\\PycharmProjects\\BO\\New-Metro-Line\\sol\\', gif_path='solution.gif')
     # G, min_w, max_w, metro_params, max_cost = load_graph('ClustersGridGenerator_tmp_0_60.json')
     # algo_params = {'num_initial_candidates': 200, 'num_new_candidates': 200, 'min_w': min_w, 'max_w': max_w,

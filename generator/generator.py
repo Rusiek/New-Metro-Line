@@ -29,7 +29,8 @@ class BaseGenerator(ABC):
         self.seed = seed
         self.path = path
         self.name = name
-        self.rng = np.random.default_rng(self.seed)
+        self.rng = np.random.default_rng()
+        # self.rng = np.random.default_rng(self.seed)
 
     @abstractmethod
     def generate(self, size:int | list[int], path: str = None, *args, **kwargs) -> list[str]:
@@ -447,7 +448,7 @@ class ClustersGridGenerator(BaseGenerator):
                         y = graph[get_id(idx)]['y']
                         ny = graph[get_id(neighbor_idx)]['y']
                         dist = np.sqrt((x - nx)**2 + (y - ny)**2)
-                        rdm_dist = dist*(population_density[int(_hmn_x(x)), int(_hmn_y(y))] + population_density[int(_hmn_x(nx)), int(_hmn_y(ny))])/2 + dist*self.time*2
+                        rdm_dist = dist*self.time*((population_density[int(_hmn_x(x)), int(_hmn_y(y))] + population_density[int(_hmn_x(nx)), int(_hmn_y(ny))])/2 + 1)*1.2
 
                         if not in_adj(get_id(neighbor_idx), graph[get_id(idx)]['adj']):
                             update_minmax(rdm_dist)
@@ -520,7 +521,7 @@ class ConsecutiveGenerator(BaseGenerator):
 
 if __name__ == '__main__':
     cg = ClustersGridGenerator(path=os.path.abspath("benchmark/test"))
-    cg.generate_batch("tmp", [40, 60], [{'s': 100}, {'s': 300}])
+    cg.generate_batch("tmp", [40, 60], [{'s': 100, 'p': 0.8}, {'s': 300, 'p': 0.8}])
 
     # cg = ConsecutiveGenerator(path=os.path.abspath("../benchmark/small"), size = 60)
     # cg.generate(path=os.path.abspath("../benchmark/small/consecutive_30.json"))
